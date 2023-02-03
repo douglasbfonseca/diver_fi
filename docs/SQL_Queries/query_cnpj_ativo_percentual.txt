@@ -1,0 +1,10 @@
+SELECT
+	tb_cnpj_fundos.id_cnpj,
+	denom_social,
+	nome_ativo,
+	percentual_ativo
+FROM
+	tb_cnpj_fundos
+INNER JOIN tb_percentual
+    ON tb_cnpj_fundos.id_cnpj = tb_percentual.id_cnpj
+ORDER BY id_cnpj;

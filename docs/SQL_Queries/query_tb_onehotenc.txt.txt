@@ -1,0 +1,5 @@
+SELECT * FROM
+	tb_cnpj_fundos
+INNER JOIN tb_one_hot
+    ON tb_cnpj_fundos.id_cnpj = tb_one_hot.id_cnpj
+ORDER BY id_cnpj;
