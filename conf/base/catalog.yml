@@ -1,0 +1,3 @@
+cvm_diver_data:
+  type: pandas.CSVDataSet
+  filepath: data/raw/cda_fi_BLC_agregate_202212.csv
