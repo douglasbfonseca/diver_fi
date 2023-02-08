@@ -3,19 +3,20 @@ import requests
 from zipfile import ZipFile
 from unicodedata import normalize
 from kedro.extras.datasets.pandas import SQLTableDataSet
+from typing import Any, Dict, Tuple
 
 
-def extract(parameters):
+def extract(parameters: Dict[str, str]) -> pd.DataFrame:
     """
     Funcao principal de extracao, define e chama download_zip_file e csv_reader.
     Concatena os DataFrames e escreve 'df_all' em 'data/agg'.
     
     Args:
-        parameters: Paramentros 'url' e 'path' definidos em parameters.yml.
+        parameters: Paramentros 'encoding', 'url' e 'path' definidos em parameters.yml.
     Returns:
         df_all: Pandas DataFrame agregado.
     """
-    def download_zip_file(parameters):
+    def download_zip_file(parameters: Dict[str, str]) -> None:
         """
         Faz o dowoload e extrai os dados .zip vindos da fonte https:// e os escreve no path.
 
@@ -32,27 +33,29 @@ def extract(parameters):
             file.extractall(path="data/raw")
             file.close()
 
-    def csv_reader(i:int):
+    def csv_reader(i:int, encoding:str, sep: str) -> pd.DataFrame:
         """
         Le os dados .csv e retorna um Pandas DataFrame.
 
         Args:
             i: Iterador.
+            encoding: enconding do arquivo .csv
+            sep: separador do arquivo .csv
         Returns:
             df: Pandas DataFrame.
         """
         year = 2022
         month = 12
         path = "data/raw/cda_fi_BLC_" + str(i) + "_" + str(year) + str(month) + ".csv"
-        df = pd.read_csv(path, encoding = "ISO-8859-1", sep = ";")
+        df = pd.read_csv(path, encoding = encoding, sep = sep)
         return df
 
     download_zip_file(parameters)
-    df_all = pd.concat([csv_reader(i) for i in range(1,9)], ignore_index=True) #Arquivo agregado!
-    df_all.to_csv('data/agg/cda_fi_BLC_agregate_202212.csv', encoding='utf-8')
+    df_all = pd.concat([csv_reader(i,parameters["encoding"], parameters["sep"]) for i in range(1,9)], ignore_index=True) 
+    df_all.to_csv('data/agg/cda_fi_BLC_agregate_202212.csv', encoding='utf-8') #Arquivo agregado!
     return df_all
 
-def transform(df_all):
+def transform(df_all: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Transforma o DataFrame agregado em 3 DataFrames distintos.
 
@@ -68,7 +71,8 @@ def transform(df_all):
     # Pegando cnpj e denominação social
     df_cnpj = df_all.groupby(by=["CNPJ_FUNDO", "DENOM_SOCIAL"]).aggregate("sum").reset_index()[["CNPJ_FUNDO", "DENOM_SOCIAL"]]
 
-    # Calculando percentual de ativos nos fundos e tirando colunas indesejáveis
+    # Calculando o valor total (em vl_fundo) e percentual dos ativos nos fundos
+    # Tirando colunas indesejáveis
     vl_fundo = pd.DataFrame(df_all.groupby(by="CNPJ_FUNDO").aggregate("sum")["VL_MERC_POS_FINAL"]).reset_index()
     df_all = pd.merge(df_all, vl_fundo, how = 'inner', on = 'CNPJ_FUNDO')
     df_all["PERCENTUAL_ATIVO"] = df_all["VL_MERC_POS_FINAL_x"]/df_all["VL_MERC_POS_FINAL_y"]
@@ -85,7 +89,7 @@ def transform(df_all):
 
     return df_cnpj , df_percentual, df_one_hot
 
-def load(df_cnpj, df_percentual, df_one_hot, parameters):
+def load(df_cnpj: pd.DataFrame, df_percentual: pd.DataFrame, df_one_hot: pd.DataFrame, parameters: Dict[str, Any]) -> None:
     """
     Funcao principal de carregamento.
     Define e chama as funcoes write_df_to_db e standardizer para carregar os DataFrames no banco de dados PostgreSQL.
@@ -98,7 +102,7 @@ def load(df_cnpj, df_percentual, df_one_hot, parameters):
     Returns:
         None
     """
-    def write_df_to_db(df, table_name, credentials):
+    def write_df_to_db(df: pd.DataFrame, table_name: str, credentials: Dict[str, str]) -> None:
         """
         Carrega a tabela no DB
         
@@ -114,7 +118,7 @@ def load(df_cnpj, df_percentual, df_one_hot, parameters):
 
         data_set.save(df)
 
-    def standardizer(elemento):
+    def standardizer(elemento: str) -> str:
         """
         Retira acentos, dois pontos, barras e demais carateres indesejaveis nas colunas das tabelas no DB.
         Padroniza em letras minusculas.
@@ -137,7 +141,7 @@ def load(df_cnpj, df_percentual, df_one_hot, parameters):
     write_df_to_db(df_percentual, "tb_percentual",parameters["credentials"])
     write_df_to_db(df_one_hot, "tb_one_hot", parameters["credentials"])
 
-def extract_12(parameters):
+def extract_12(parameters: Dict[str, str]) -> pd.DataFrame:
     """
     Funcao principal de extracao para os 12 meses. 
     Define e chama download_zip_file_12 e csv_reader_12.
@@ -148,7 +152,16 @@ def extract_12(parameters):
     Returns:
         df_all: Pandas DataFrame agregado.
     """
-    def download_zip_file_12(i,parameters):
+    def download_zip_file_12(i: int, parameters: Dict[str, str]) -> None:
+        """
+        Faz o dowoload e extrai os dados .zip vindos da fonte https:// e os escreve no path.
+
+        Args:
+            i: Iterador
+            parameters: Paramentros "url" e "path" definidos em parameters.yml.
+        Returns:
+            None.
+        """
         if i < 10:
             new_url = parameters["url"][:-6] + '0' + str(i) + parameters["url"][-4:]
         else:
@@ -164,17 +177,29 @@ def extract_12(parameters):
             file.extractall(path="data/raw")
             file.close()
 
-    def csv_reader_12(i:int, month):
+    def csv_reader_12(i:int, month: int, encoding: str, sep: str) -> pd.DataFrame:
+        """
+        Le os dados .csv e retorna um Pandas DataFrame.
+
+        Args:
+            i: Iterador.
+            month: mês do arquivo .csv
+            encoding: enconding do arquivo .csv
+            sep: separador do arquivo .csv
+        Returns:
+            df: Pandas DataFrame.
+        """
         year = 2022
         month = '0' + str(month) if month < 10 else str(month)
         path = "data/raw/cda_fi_BLC_" + str(i) + "_" + str(year) + month + ".csv"
-        df = pd.read_csv(path, encoding = "ISO-8859-1", sep = ";")
+        df = pd.read_csv(path, encoding = encoding, sep = sep)
         return df
 
     for i in range(1,13):
         download_zip_file_12(i,parameters)
 
-    df_all = pd.concat([csv_reader_12(i, month) for i in range(1,9) for month in range(1,13)], ignore_index=True)
+    df_all = pd.concat([csv_reader_12(i, month, parameters["encoding"], parameters["sep"]) for i in range(1,9) for month in range(1,13)], ignore_index=True)
     df_all.to_csv('data/agg/cda_fi_BLC_agregate_202212.csv', encoding='utf-8')
+    df_all = df_all[["CNPJ_FUNDO", "DENOM_SOCIAL", "TP_ATIVO","VL_MERC_POS_FINAL"]]
     return df_all
 

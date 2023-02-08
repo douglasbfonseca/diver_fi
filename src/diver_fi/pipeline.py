@@ -1,5 +1,5 @@
 from kedro.pipeline import Pipeline, node, pipeline
-from .nodes import  extract, transform, load
+from .nodes import extract, transform, load
 
 
 def create_pipeline(**kwargs) -> Pipeline:

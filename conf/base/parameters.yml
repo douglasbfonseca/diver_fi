@@ -1,7 +1,8 @@
 
 url: https://dados.cvm.gov.br/dados/FI/DOC/CDA/DADOS/cda_fi_202212.zip
 path: data/download/cda_fi_202212.zip
+encoding: ISO-8859-1
+sep: ;
 
 
-
-credentials: {"con": "postgresql://postgres:senha123@localhost/db_teste_2"}
+credentials: {"con": "postgresql://postgres:senha123@localhost/db_diver_fi"}
