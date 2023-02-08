@@ -7,9 +7,23 @@ from kedro.extras.datasets.pandas import SQLTableDataSet
 
 def extract(parameters):
     """
-    Extrai os dados da fonte
+    Funcao principal de extracao, define e chama download_zip_file e csv_reader.
+    Concatena os DataFrames e escreve 'df_all' em 'data/agg'.
+    
+    Args:
+        parameters: Paramentros 'url' e 'path' definidos em parameters.yml.
+    Returns:
+        df_all: Pandas DataFrame agregado.
     """
     def download_zip_file(parameters):
+        """
+        Faz o dowoload e extrai os dados .zip vindos da fonte https:// e os escreve no path.
+
+        Args:
+            parameters: Paramentros "url" e "path" definidos em parameters.yml.
+        Returns:
+            None.
+        """
         file = requests.get(parameters["url"])
         if file.status_code == requests.codes.OK:
             with open(parameters["path"], "wb") as cda_fi:
@@ -19,6 +33,14 @@ def extract(parameters):
             file.close()
 
     def csv_reader(i:int):
+        """
+        Le os dados .csv e retorna um Pandas DataFrame.
+
+        Args:
+            i: Iterador.
+        Returns:
+            df: Pandas DataFrame.
+        """
         year = 2022
         month = 12
         path = "data/raw/cda_fi_BLC_" + str(i) + "_" + str(year) + str(month) + ".csv"
@@ -32,8 +54,17 @@ def extract(parameters):
 
 def transform(df_all):
     """
-    Transforma os dados
+    Transforma o DataFrame agregado em 3 DataFrames distintos.
+
+    Args:
+        df_all: Pandas DataFrame agregado.
+    Returns:
+        df_cnpj: DataFrame contento o CNPJ e a Denominacao Social dos fundos.
+        df_percentual: DataFrame contendo o percentual de cada ativo por fundo.
+        df_one_hot: DataFrame na formatacao ONEHOTENCODER, com os ativos transformados em colunas.
     """
+    # inputando fundo com denominação social NaN - somente o "45.908.231/0001-36" neste caso
+    df_all["DENOM_SOCIAL"] = df_all["DENOM_SOCIAL"].fillna("Sem denominacao social NaN")
     # Pegando cnpj e denominação social
     df_cnpj = df_all.groupby(by=["CNPJ_FUNDO", "DENOM_SOCIAL"]).aggregate("sum").reset_index()[["CNPJ_FUNDO", "DENOM_SOCIAL"]]
 
@@ -56,15 +87,43 @@ def transform(df_all):
 
 def load(df_cnpj, df_percentual, df_one_hot, parameters):
     """
-    Carrega os dataframes no banco de dados PostgreSQL
+    Funcao principal de carregamento.
+    Define e chama as funcoes write_df_to_db e standardizer para carregar os DataFrames no banco de dados PostgreSQL.
+
+    Args:
+        parameters: Parametro "credentials" definido em parameters.yml.
+        df_cnpj: DataFrame contento o CNPJ e a Denominacao Social dos fundos.
+        df_percentual: DataFrame contendo o percentual de cada ativo por fundo.
+        df_one_hot: DataFrame na formatacao ONEHOTENCODER, com os ativos transformados em colunas.
+    Returns:
+        None
     """
     def write_df_to_db(df, table_name, credentials):
+        """
+        Carrega a tabela no DB
+        
+        Args:
+            df: Pandas DataFrame
+            table_name: nome da tabela
+            credentials: dicionario com as credenciais do servidor e do DB
+        Return:
+            None
+        """
         data_set = SQLTableDataSet(table_name=table_name,
                                credentials=credentials)
 
         data_set.save(df)
 
     def standardizer(elemento):
+        """
+        Retira acentos, dois pontos, barras e demais carateres indesejaveis nas colunas das tabelas no DB.
+        Padroniza em letras minusculas.
+
+        Args:
+            elemento: string fora do padrao
+        Return:
+            elemento: string dentro do padrao
+        """
         elemento = normalize('NFKD', elemento).encode('ASCII','ignore').decode('ASCII').lower()
         elemento = elemento.replace(":","_")
         elemento = elemento.replace("/","_")
@@ -78,5 +137,44 @@ def load(df_cnpj, df_percentual, df_one_hot, parameters):
     write_df_to_db(df_percentual, "tb_percentual",parameters["credentials"])
     write_df_to_db(df_one_hot, "tb_one_hot", parameters["credentials"])
 
+def extract_12(parameters):
+    """
+    Funcao principal de extracao para os 12 meses. 
+    Define e chama download_zip_file_12 e csv_reader_12.
+    Concatena os DataFrames e escreve 'df_all' em 'data/agg'.
+    
+    Args:
+        parameters: Paramentros 'url' e 'path' definidos em parameters.yml.
+    Returns:
+        df_all: Pandas DataFrame agregado.
+    """
+    def download_zip_file_12(i,parameters):
+        if i < 10:
+            new_url = parameters["url"][:-6] + '0' + str(i) + parameters["url"][-4:]
+        else:
+            new_url = parameters["url"][:-6] + str(i) + parameters["url"][-4:]
+        
+        new_path = parameters["path"][:14] + new_url[-17:]
+        
+        file = requests.get(new_url)
+        if file.status_code == requests.codes.OK:
+            with open(new_path, "wb") as cda_fi:
+                cda_fi.write(file.content)
+            file = ZipFile(new_path, "r")
+            file.extractall(path="data/raw")
+            file.close()
 
+    def csv_reader_12(i:int, month):
+        year = 2022
+        month = '0' + str(month) if month < 10 else str(month)
+        path = "data/raw/cda_fi_BLC_" + str(i) + "_" + str(year) + month + ".csv"
+        df = pd.read_csv(path, encoding = "ISO-8859-1", sep = ";")
+        return df
+
+    for i in range(1,13):
+        download_zip_file_12(i,parameters)
+
+    df_all = pd.concat([csv_reader_12(i, month) for i in range(1,9) for month in range(1,13)], ignore_index=True)
+    df_all.to_csv('data/agg/cda_fi_BLC_agregate_202212.csv', encoding='utf-8')
+    return df_all
 

@@ -1,3 +1,7 @@
+"""
+Arquivo executavel 
+"""
+
 import importlib
 from pathlib import Path
 
