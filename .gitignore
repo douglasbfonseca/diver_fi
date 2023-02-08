@@ -1,5 +1,7 @@
 #data
-data/**
+data/agg/*.csv
+data/download/*.zip
+data/raw/*.csv
 notebooks/data_notebooks/**
 
 #logs

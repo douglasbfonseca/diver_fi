@@ -20,6 +20,8 @@ Pandas
 
 psycopg2
 
+sqlalchemy
+
 ### Output
 São 2 os outputs:
 - Um arquivo .csv agregado no diretório data/agg
