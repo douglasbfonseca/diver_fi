@@ -1,0 +1,13 @@
+ALTER TABLE tb_cnpj_fundos
+ADD CONSTRAINT id_cnpj_pk 
+PRIMARY KEY (id_cnpj);
+
+ALTER TABLE tb_percentual
+ADD CONSTRAINT id_cnpj_fk
+FOREIGN KEY (id_cnpj)
+REFERENCES tb_cnpj_fundos (id_cnpj);
+
+ALTER TABLE tb_one_hot
+ADD CONSTRAINT id_cnpj_fk
+FOREIGN KEY (id_cnpj)
+REFERENCES tb_cnpj_fundos (id_cnpj);
