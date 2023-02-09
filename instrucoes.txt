@@ -1,0 +1,35 @@
+Instruções de uso:
+------------------
+Core:
+-Clonar o repositório
+
+-Ter instalado as bibliotecas: Kedro, Pandas, psycopg2, sqlalchemy
+
+-Ter o server PostgreSQL rodando Database
+ -importante:
+	O arquivo conf/base/parameters.yml contém as credenciais do DB:
+	credentials: {"con": "postgresql://postgres:senha123@localhost/db_diver_fi"}
+	Usar o server, o DB, o usuário e a senha locais!
+
+-Abrir o terminal no diretório onde o repositório se encontra.
+-Run com: 'kedro run' ou 'python -m kedro run'
+
+Banco de dados PostgreSQL:
+No folder docs/SQL_Queries se encontram os arquivos .txt, para:
+Criar o banco de dados SQL, se necessário.
+Dar os joins nas tabelas que já estão normalizadas.
+Executar a criação das constraints (PKs e FKs)
+
+------------------
+
+
+Opcionais:
+
+Ambiente virtual:
+Caso queira rodar em um ambiente virtual, no folder principal encontram-se: Pipfile e Pipfile.lock
+Criar um ambiente virtual 'pipenv' no diretório principal e: 'pipenv install --ignore-pipfile'
+Para instalar as bibliotecas.
+
+Docker:
+A imagem do 'src' do job encontra-se em 'douglasbfonseca/diver-fi-etl'
+Necessário um airflow que puxe também os parêmetros config (catalog.yml, logging.yml e parameters.yml) do job. 
